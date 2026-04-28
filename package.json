@@ -1,0 +1,16 @@
+{
+  "name": "capslock-task",
+  "version": "1.0.0",
+  "description": "Tech task",
+  "packageManager": "pnpm@10.27.0",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:name": "pnpm test -g"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}

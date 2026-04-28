@@ -1,0 +1,81 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playwright-tests
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps
+
+      - name: Run Playwright tests
+        id: playwright-tests
+        continue-on-error: true
+        run: pnpm exec playwright test
+
+      - name: Add test failure note to summary
+        if: ${{ steps.playwright-tests.outcome == 'failure' }}
+        run: echo "Playwright tests failed, but the workflow is configured to continue and upload the report." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ensure deployable report exists
+        if: ${{ always() }}
+        run: |
+          if [ ! -d playwright-report ] || [ "$(find playwright-report -type f | wc -l)" -eq 0 ]; then
+            mkdir -p playwright-report
+            printf '%s\n' \
+              '<!doctype html>' \
+              '<html lang="en">' \
+              '<head>' \
+              '  <meta charset="utf-8">' \
+              '  <meta name="viewport" content="width=device-width, initial-scale=1">' \
+              '  <title>Playwright Report Unavailable</title>' \
+              '  <style>body{font-family:Arial,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.5}h1{margin-bottom:12px}</style>' \
+              '</head>' \
+              '<body>' \
+              '  <h1>Playwright report is unavailable</h1>' \
+              '  <p>The workflow continued after a failure, but Playwright did not generate an HTML report for this run.</p>' \
+              '  <p>Check the GitHub Actions job logs for the exact failure details.</p>' \
+              '</body>' \
+              '</html>' \
+              > playwright-report/index.html
+          fi
+
+      - name: Upload test report artifact
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
